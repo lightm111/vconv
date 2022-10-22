@@ -33,10 +33,10 @@ def mc(infile):
     filepath,filename = os.path.split(infile)
     if filepath=="": filepath="."
     outfile = f"{filepath}{os.sep}{OUT_DIR}{os.sep}{filename}"         # output file
-    print(f"\n[underline bold cyan][blink]>[/blink]Now converting {filename}[/]")
+    print(f"\n>[underline bold cyan]Now converting {filename}[/]")
 
     if "yuv420p10" not in co(f'ffprobe -loglevel fatal -print_format csv -i "{infile}" -show_streams'):
-        if not Confirm.ask(r"[italic yellow]not an 10bit video, Continue anyway?[/]"): return 1
+        if not Confirm.ask(r"[italic yellow]not a 10bit video, continue anyway?[/]"): return 1
 
     # dectect and skip english dub (for anime)
     if stdargs.ne:
@@ -66,7 +66,7 @@ def mc(infile):
 
     # Starting converting
     if os.path.isfile(outfile):
-        cho = Prompt.ask("output file exist, overwrite/rename new/skip?", choices=["w", "r", "s"], default="s")
+        cho = Prompt.ask("[italic yellow]output file exists, overwrite/rename/skip?[/]", choices=["w", "r", "s"], default="s")
         if cho=="w": OUT_OPT += " -y"
         elif cho=="r":
             new_outfile = Prompt.ask("New name", default=outfile, show_default=False)
@@ -80,7 +80,6 @@ def mc(infile):
     os.makedirs(f"{filepath}{os.sep}{OUT_DIR}", exist_ok=True)
 
     # progress bar
-    #print(json.loads(co("mediainfo --Output=JSON '%s'" %infile)))
     try:
         nframe = int(json.loads(co(f'mediainfo --Output=JSON "{infile}"'))["media"]["track"][0]["FrameCount"])
     except TypeError:
@@ -101,7 +100,7 @@ def mc(infile):
                     pro.update(tsk, completed=ind)
         except KeyboardInterrupt:
             pro.stop()
-            print(f"canceling, next then")
+            print(f"canceled, next!")
             return 2
 
     END_T = time()
@@ -109,7 +108,7 @@ def mc(infile):
     # Calculating time
     T_MINUTES = int((END_T - START_T)/60)
     T_SECONDS = int(END_T - START_T)%60
-    MESSAGE = f"[bold]Finished in {T_MINUTES}mn {T_SECONDS}s[/bold]"
+    MESSAGE = f"Finished in {T_MINUTES}mn {T_SECONDS}s"
 
     # Comparing file size
     INI_SIZE = os.stat(infile).st_size
@@ -117,7 +116,7 @@ def mc(infile):
     RATIO = round(100.0*(FIN_SIZE-INI_SIZE)/INI_SIZE, 2)
     if (RATIO>0): RATIO = f"+{RATIO}"
     print(
-        "[green]Initial size: {0}Mb, Final size: {1}Mb ({2}%)\n {3} [/]".format(
+        "[green]Original size: {0}Mb, Final size: {1}Mb ({2}%)\n {3} [/]".format(
             round(INI_SIZE/1024/1024, 3),
             round(FIN_SIZE/1024/1024, 3),
             RATIO, MESSAGE
@@ -125,7 +124,7 @@ def mc(infile):
         )
 
     # Sending notification
-    try: os.system(f'notify-send vconv "{MESSAGE}"')
+    try: os.system(f'notify-send vconv "{infile}\n{MESSAGE}"')
     except: print("Done")
 
 
@@ -135,14 +134,12 @@ for (i, infile) in zip(range(len(FILE),0,-1), FILE):
     rc = mc(infile)
     if i==1 or rc: continue
     try:
-        with Progress(TextColumn("{task.description}"), TimeRemainingColumn()) as progress:
-            task = progress.add_task("[bold green on red]Cooling time![/]", total=stdargs.cool_time)
-            while not progress.finished:
-                progress.update(task, advance=1)
-                if not progress.finished: sleep(1)
+        with Progress(TextColumn("{task.description}"), TimeRemainingColumn(), transient=True) as p:
+            for s in p.track(range(stdargs.cool_time), description=r"[bold green on red]Cooling time![/]"): sleep(1)
     except KeyboardInterrupt:
-        print("[italic red]can't wait, huh?[/]")
+        p.stop()
+        print("[italic yellow]can't wait, next![/]")
         sleep(1)
 
-print(":smile: All done!")
+print("[bold green]All done![/] :smile-emoji:")
 
